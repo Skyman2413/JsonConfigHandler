@@ -1,8 +1,8 @@
 pub mod json;
 
+use json::Json;
 use std::fs::File;
 use std::io::Read;
-use json::Json;
 
 pub struct Config {
     data: Json,
