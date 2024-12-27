@@ -26,8 +26,6 @@ impl From<String> for Json {
     }
 }
 
-
-
 #[derive(Debug, Eq, PartialEq)]
 enum JsonValue {
     Object(HashMap<String, JsonValue>),
@@ -99,7 +97,10 @@ impl JsonValue {
                     }
                 }
                 ',' if stack.is_empty() && !inside_string => {
-                    elements.insert(current_key.clone(), Self::parse(&current_value.clone())?);
+                    if elements.insert(
+                        current_key.clone(),
+                        Self::parse(&current_value)?,
+                    ).is_some() {panic!("Invalid JSON object")};
                     is_key = true;
                     current_key.clear();
                     current_value.clear();
@@ -107,14 +108,17 @@ impl JsonValue {
                 _ => {
                     if inside_string && is_key {
                         current_key.push(ch)
-                    } else if !is_key{
+                    } else if !is_key {
                         current_value.push(ch);
                     }
                 }
             }
         }
         if !current_key.is_empty() && !current_value.is_empty() {
-            elements.insert(current_key.clone(), Self::parse(&current_value)?);
+            if elements.insert(
+                current_key.clone(),
+                Self::parse(&current_value)?,
+            ).is_some() {panic!("Invalid JSON object")};
             current_key.clear();
             current_value.clear();
             is_key = true
@@ -197,6 +201,12 @@ mod tests {
     use super::*;
 
     #[test]
+    #[should_panic]
+    fn test_duplicate_key() {
+        let input = "{\"foo\": 1234, \"foo\": true}";
+        let json = Json::from(input.to_string());
+    }
+    #[test]
     fn test_leveled_structure() {
         let input = "{\"struct\": {\"hello\": [\"world\", 24]}, \"my_life\": \"be live\"}";
         let json = Json::from(input.to_string());
@@ -211,13 +221,17 @@ mod tests {
             ]),
         );
         expected_object.insert("struct".to_string(), JsonValue::Object(inside_obj));
-        expected_object.insert("my_life".to_string(), JsonValue::String("be live".to_string()));
+        expected_object.insert(
+            "my_life".to_string(),
+            JsonValue::String("be live".to_string()),
+        );
 
         let expected = Json {
             data: JsonRoot::Object(expected_object),
         };
 
-        assert_eq!(json, expected);    }
+        assert_eq!(json, expected);
+    }
     #[test]
     fn test_all_simple_types() {
         let input = "{\"foo\": \"bar\", \"boo\": true, \"far\": 34, \"nil\": null}";
