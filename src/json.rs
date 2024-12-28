@@ -97,10 +97,12 @@ impl JsonValue {
                     }
                 }
                 ',' if stack.is_empty() && !inside_string => {
-                    if elements.insert(
-                        current_key.clone(),
-                        Self::parse(&current_value)?,
-                    ).is_some() {panic!("Invalid JSON object")};
+                    if elements
+                        .insert(current_key.clone(), Self::parse(&current_value)?)
+                        .is_some()
+                    {
+                        panic!("Invalid JSON object")
+                    };
                     is_key = true;
                     current_key.clear();
                     current_value.clear();
@@ -115,10 +117,12 @@ impl JsonValue {
             }
         }
         if !current_key.is_empty() && !current_value.is_empty() {
-            if elements.insert(
-                current_key.clone(),
-                Self::parse(&current_value)?,
-            ).is_some() {panic!("Invalid JSON object")};
+            if elements
+                .insert(current_key.clone(), Self::parse(&current_value)?)
+                .is_some()
+            {
+                panic!("Invalid JSON object")
+            };
             current_key.clear();
             current_value.clear();
             is_key = true
@@ -202,6 +206,12 @@ mod tests {
 
     #[test]
     #[should_panic]
+    fn test_incorrect_structure() {
+        let input = "{\"Hello\": {[\"asdf\", 2134}]}";
+        let json = JsonValue::parse(input).unwrap();
+    }
+    #[test]
+    #[should_panic]
     fn test_duplicate_key() {
         let input = "{\"foo\": 1234, \"foo\": true}";
         let json = Json::from(input.to_string());
@@ -210,7 +220,6 @@ mod tests {
     fn test_leveled_structure() {
         let input = "{\"struct\": {\"hello\": [\"world\", 24]}, \"my_life\": \"be live\"}";
         let json = Json::from(input.to_string());
-
         let mut expected_object = HashMap::new();
         let mut inside_obj = HashMap::new();
         inside_obj.insert(
@@ -225,36 +234,29 @@ mod tests {
             "my_life".to_string(),
             JsonValue::String("be live".to_string()),
         );
-
         let expected = Json {
             data: JsonRoot::Object(expected_object),
         };
-
         assert_eq!(json, expected);
     }
     #[test]
     fn test_all_simple_types() {
         let input = "{\"foo\": \"bar\", \"boo\": true, \"far\": 34, \"nil\": null}";
         let json = Json::from(input.to_string());
-
         let mut expected_object = HashMap::new();
         expected_object.insert("foo".to_string(), JsonValue::String("bar".to_string()));
         expected_object.insert("boo".to_string(), JsonValue::Bool(true));
         expected_object.insert("far".to_string(), JsonValue::Number(34));
         expected_object.insert("nil".to_string(), JsonValue::Null);
-
         let expected = Json {
             data: JsonRoot::Object(expected_object),
         };
-
         assert_eq!(json, expected);
     }
     #[test]
     fn one_array_test_with_all_simple_types() {
         let input = "{\"foo\": [\"asdf\", 1, null, true]}";
         let json = Json::from(input.to_string());
-
-        // Ожидаемое значение
         let mut expected_object = HashMap::new();
         expected_object.insert(
             "foo".to_string(),
@@ -265,11 +267,9 @@ mod tests {
                 JsonValue::Bool(true),
             ]),
         );
-
         let expected = Json {
             data: JsonRoot::Object(expected_object),
         };
-
         assert_eq!(json, expected);
     }
 }
