@@ -1,10 +1,10 @@
 pub mod json;
 
+use crate::json::{JsonError, JsonValue};
 use json::Json;
 use std::fs::File;
 use std::io;
 use std::io::{Read, Write};
-use crate::json::{JsonError, JsonValue};
 
 pub struct Config(Json);
 impl Config {
@@ -17,7 +17,7 @@ impl Config {
 
     pub fn save_to_file(&self, path: &str) -> io::Result<()> {
         let mut file = File::create(path)?;
-        let json_string = format!("{:?}", self.0); // or implement custom serialization logic
+        let json_string = format!("{}", self.0);
         file.write_all(json_string.as_bytes())?;
         Ok(())
     }

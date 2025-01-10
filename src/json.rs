@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::fmt::Display;
 
 #[derive(Debug, Eq, PartialEq)]
 enum JsonRoot {
@@ -11,33 +12,46 @@ enum JsonRoot {
 pub struct Json {
     data: JsonRoot,
 }
+impl Display for Json {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        JsonValue::from(&self.data).fmt(f)
+    }
+}
 impl Json {
     pub fn get(&self, key: &str) -> Result<JsonValue, JsonError> {
         let mut current_object = match &self.data {
             JsonRoot::Object(obj) => obj,
-            _ => return Err(JsonError::ParseError("Can't go into not Object".to_string())),
+            _ => {
+                return Err(JsonError::ParseError(
+                    "Can't go into not Object".to_string(),
+                ))
+            }
         };
         let mut result: JsonValue = JsonValue::Object(current_object.clone());
         let mut can_take_next: bool = true;
-        for part in key.split('.'){
+        for part in key.split('.') {
             if !can_take_next {
-                return Err(JsonError::ParseError(format!("There is no key {part}")))
+                return Err(JsonError::ParseError(format!("There is no key {part}")));
             }
             current_object = match current_object.get(part) {
                 Some(JsonValue::Object(obj)) => obj,
                 Some(value) => {
                     result = value.clone();
                     can_take_next = false;
-                    continue
-                },
-                None => return Err(JsonError::ParseError(format!("Can't go into not object at {part}"))),
+                    continue;
+                }
+                None => {
+                    return Err(JsonError::ParseError(format!(
+                        "Can't go into not object at {part}"
+                    )))
+                }
             }
         }
         Ok(result)
     }
 
     pub fn set(&mut self, key: &str, value: JsonValue) -> Result<(), JsonError> {
-        if key.trim().is_empty(){
+        if key.trim().is_empty() {
             return Err(JsonError::ParseError("Can't set empty key".to_string()));
         }
         let parts: Vec<&str> = key.trim().split('.').collect();
@@ -49,11 +63,11 @@ impl Json {
 
         for (i, part) in parts.iter().enumerate() {
             let part = *part;
-            
+
             if !current.contains_key(part) {
                 current.insert(part.to_string(), JsonValue::Object(HashMap::new()));
             }
-            
+
             if i == parts.len() - 1 {
                 current.insert(part.to_string(), value);
                 return Ok(());
@@ -98,7 +112,16 @@ pub enum JsonValue {
     Bool(bool),
     Null,
 }
-impl fmt::Display for JsonValue {
+impl From<&JsonRoot> for JsonValue {
+    // Bad idea to clone...
+    fn from(data: &JsonRoot) -> JsonValue {
+        match data {
+            JsonRoot::Object(obj) => JsonValue::Object(obj.clone()),
+            JsonRoot::Array(arr) => JsonValue::Array(arr.clone()),
+        }
+    }
+}
+impl Display for JsonValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             JsonValue::Object(obj) => {
@@ -140,7 +163,9 @@ impl JsonValue {
     fn parse_object(input: &str) -> Result<JsonValue, JsonError> {
         let input = input.trim();
         if !input.starts_with('{') || !input.ends_with('}') {
-            return Err(JsonError::ParseError("Invalid JSON object: must start with '{' and end with '}'".to_string()));
+            return Err(JsonError::ParseError(
+                "Invalid JSON object: must start with '{' and end with '}'".to_string(),
+            ));
         }
 
         let mut elements: HashMap<String, JsonValue> = HashMap::new();
@@ -171,7 +196,10 @@ impl JsonValue {
                 }
                 ']' | '}' if !inside_string => {
                     if stack.pop() != Some(if ch == ']' { '[' } else { '{' }) {
-                        return Err(JsonError::ParseError(format!("Invalid JSON object: {}", ch)));
+                        return Err(JsonError::ParseError(format!(
+                            "Invalid JSON object: {}",
+                            ch
+                        )));
                     }
                     if is_key {
                         current_key.push(ch);
@@ -216,7 +244,10 @@ impl JsonValue {
             || !current_key.is_empty()
             || inside_string
         {
-            return Err(JsonError::ParseError(format!("Invalid JSON object: {}", input)));
+            return Err(JsonError::ParseError(format!(
+                "Invalid JSON object: {}",
+                input
+            )));
         }
 
         Ok(JsonValue::Object(elements))
@@ -225,7 +256,9 @@ impl JsonValue {
     fn parse_array(input: &str) -> Result<JsonValue, JsonError> {
         let input = input.trim();
         if !input.starts_with('[') || !input.ends_with(']') {
-            return Err(JsonError::ParseError("Invalid JSON array: must start with '[' and end with ']'".to_string()));
+            return Err(JsonError::ParseError(
+                "Invalid JSON array: must start with '[' and end with ']'".to_string(),
+            ));
         }
 
         let mut elements = Vec::new();
@@ -263,9 +296,15 @@ impl JsonValue {
             current.clear();
         }
         if inside_string {
-            Err(JsonError::ParseError(format!("Invalid JSON array: {}", current)))
+            Err(JsonError::ParseError(format!(
+                "Invalid JSON array: {}",
+                current
+            )))
         } else if !stack.is_empty() {
-            Err(JsonError::ParseError(format!("Invalid JSON array: {:?}", stack)))
+            Err(JsonError::ParseError(format!(
+                "Invalid JSON array: {:?}",
+                stack
+            )))
         } else {
             Ok(JsonValue::Array(elements))
         }
@@ -285,7 +324,7 @@ impl JsonValue {
 }
 
 #[derive(Debug)]
-pub enum JsonError{
+pub enum JsonError {
     KeyNotFound(String),
     InvalidType(String),
     ParseError(String),
@@ -374,21 +413,16 @@ mod tests {
 
     #[test]
     fn test_set_value() {
-        let mut json = Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value\" } } }".to_string());
+        let mut json =
+            Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value\" } } }".to_string());
 
         json.set("key1.key2.key4", JsonValue::Number(42)).unwrap();
 
-        assert_eq!(
-            json.get("key1.key2.key4").unwrap(),
-            JsonValue::Number(42)
-        );
+        assert_eq!(json.get("key1.key2.key4").unwrap(), JsonValue::Number(42));
 
         json.set("key1.key5", JsonValue::Bool(true)).unwrap();
 
-        assert_eq!(
-            json.get("key1.key5").unwrap(),
-            JsonValue::Bool(true)
-        );
+        assert_eq!(json.get("key1.key5").unwrap(), JsonValue::Bool(true));
     }
 
     #[test]
@@ -413,8 +447,11 @@ mod tests {
     fn test_set_deeply_nested_key() {
         let mut json = Json::from("{ \"key1\": { \"key2\": {} } }".to_string());
 
-        json.set("key1.key2.key3.key4", JsonValue::String("deep_value".to_string()))
-            .unwrap();
+        json.set(
+            "key1.key2.key3.key4",
+            JsonValue::String("deep_value".to_string()),
+        )
+        .unwrap();
 
         assert_eq!(
             json.get("key1.key2.key3.key4").unwrap(),
@@ -453,7 +490,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-
     #[test]
     fn test_set_creates_root_object_if_empty() {
         let mut json = Json::from("{}".to_string());
@@ -465,7 +501,8 @@ mod tests {
 
     #[test]
     fn test_set_handles_multiple_nested_keys() {
-        let mut json = Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value3\" } } }".to_string());
+        let mut json =
+            Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value3\" } } }".to_string());
 
         json.set("key1.key2.key4", JsonValue::String("new_value".to_string()))
             .unwrap();
@@ -482,7 +519,8 @@ mod tests {
 
     #[test]
     fn test_set_replaces_entire_object() {
-        let mut json = Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value3\" } } }".to_string());
+        let mut json =
+            Json::from("{ \"key1\": { \"key2\": { \"key3\": \"value3\" } } }".to_string());
 
         json.set(
             "key1.key2",
@@ -491,7 +529,7 @@ mod tests {
                 JsonValue::Bool(true),
             )])),
         )
-            .unwrap();
+        .unwrap();
 
         assert_eq!(
             json.get("key1.key2.new_key").unwrap(),
